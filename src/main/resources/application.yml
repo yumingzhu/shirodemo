@@ -1,15 +1,18 @@
 server:
   port: 8080
 spring:
-    datasource:
-        url: jdbc:mysql://127.0.0.1:3306/testdb?autoReconnect=true&useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=CTT
-        username: root
-        password: 123456
-        driver-class-name: com.mysql.jdbc.Driver
-    mvc:
-        view:
-          prefix: /WEB-INF/views
-          suffix: .html
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/test?autoReconnect=true&useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=CTT
+    username: root
+    password: yumingzhu
+    driver-class-name: com.mysql.jdbc.Driver
+  redis:
+    cluster:
+      nodes: 192.168.41.223:6379,192.168.41.223:6380,192.168.41.223:6381,192.168.41.223:6382,192.168.41.223:6383,192.168.41.223:6384
+  mvc:
+    view:
+      prefix: /WEB-INF/views
+      suffix: .html
 mybatis-plus:
-    mapper-locations: classpath:mapper/*Mapper.xml
-    type-aliases-package: com.lijincan.pojo
+  mapper-locations: classpath:mapper/*Mapper.xml
+  type-aliases-package: com.lijincan.pojo

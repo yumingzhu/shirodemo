@@ -1,6 +1,7 @@
 package com.yumingzhu.shirodemo.config;
 
-import com.yumingzhu.shirodemo.pojo.User;
+import javax.annotation.Resource;
+
 import org.apache.shiro.SecurityUtils;
 import org.apache.shiro.authc.*;
 import org.apache.shiro.authz.AuthorizationInfo;
@@ -9,27 +10,38 @@ import org.apache.shiro.realm.AuthorizingRealm;
 import org.apache.shiro.subject.PrincipalCollection;
 import org.apache.shiro.subject.Subject;
 
+import com.yumingzhu.shirodemo.pojo.User;
+import com.yumingzhu.shirodemo.service.UserService;
+
 public class UserRealm extends AuthorizingRealm {
-    @Override
-    protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principalCollection) {
-        System.out.println(">>授权");
-        SimpleAuthorizationInfo info = new SimpleAuthorizationInfo();
 
-        return info;
-    }
+	@Resource
+	UserService userService;
 
-    @Override
-    protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken authenticationToken) throws AuthenticationException {
-        System.out.println(">>认证");
+	@Override
+	protected AuthorizationInfo doGetAuthorizationInfo(PrincipalCollection principalCollection) {
+		System.out.println(">>授权");
+		SimpleAuthorizationInfo info = new SimpleAuthorizationInfo();
+		User user = (User) principalCollection.getPrimaryPrincipal();
+		String permission = user.getPermission();
+		info.addStringPermission(permission);
+		return info;
+	}
 
-        String username="root";
-        String password="123456";
-        UsernamePasswordToken  token= (UsernamePasswordToken) authenticationToken;
-         if(!token.getUsername().equals(username)){
-             return  null;
-         }
-        Subject subject = SecurityUtils.getSubject();
+	@Override
+	protected AuthenticationInfo doGetAuthenticationInfo(AuthenticationToken authenticationToken)
+			throws AuthenticationException {
+		System.out.println(">>认证");
 
-        return new SimpleAuthenticationInfo("",password,"");
-    }
+		UsernamePasswordToken token = (UsernamePasswordToken) authenticationToken;
+		String username = token.getUsername();
+		User user = userService.getUserByName(username);
+		if (!username.equals(user.getName())) {
+			return null;
+		}
+		SimpleAuthenticationInfo simpleAuthenticationInfo = new SimpleAuthenticationInfo(user, user.getPwd(),
+				getName());
+
+		return simpleAuthenticationInfo;
+	}
 }

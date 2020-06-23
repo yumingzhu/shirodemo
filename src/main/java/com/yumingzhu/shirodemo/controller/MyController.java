@@ -2,11 +2,13 @@ package com.yumingzhu.shirodemo.controller;
 
 
 import org.apache.shiro.SecurityUtils;
+import org.apache.shiro.authc.ExcessiveAttemptsException;
 import org.apache.shiro.authc.IncorrectCredentialsException;
 import org.apache.shiro.authc.UnknownAccountException;
 import org.apache.shiro.authc.UsernamePasswordToken;
 import org.apache.shiro.subject.Subject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -32,6 +34,8 @@ public class MyController {
 
     @RequestMapping("/user/add")
     public String add(){
+        Subject subject = SecurityUtils.getSubject();
+        System.out.println(subject.isAuthenticated());
         return "user/add";
     }
     @RequestMapping("/user/update")
@@ -49,10 +53,13 @@ public class MyController {
         Subject subject = SecurityUtils.getSubject();
         //封装用户登录数据
         UsernamePasswordToken token =new UsernamePasswordToken(username,password);
-
+        token.setRememberMe(true);
         try{
             subject.login(token);
             return "index";
+        }catch (ExcessiveAttemptsException e){//用户名不存在
+            model.addAttribute("msg","账号已经被锁定");
+            return "login";
         }catch (UnknownAccountException e){//用户名不存在
             model.addAttribute("msg","用户名错误");
             return "login";
@@ -64,7 +71,8 @@ public class MyController {
 
     @RequestMapping("/noauth")
     public String unauthorized(){
-        return "未授权";
+
+        return "noauth";
     }
 }
 
