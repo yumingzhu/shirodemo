@@ -3,18 +3,14 @@ package com.yumingzhu.shirodemo.config;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import com.fasterxml.jackson.annotation.PropertyAccessor;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import javax.servlet.Filter;
+
 import org.apache.shiro.authc.credential.HashedCredentialsMatcher;
 import org.apache.shiro.cache.MemoryConstrainedCacheManager;
-import org.apache.shiro.codec.Base64;
 import org.apache.shiro.session.mgt.SessionManager;
 import org.apache.shiro.session.mgt.eis.JavaUuidSessionIdGenerator;
-import org.apache.shiro.session.mgt.eis.MemorySessionDAO;
 import org.apache.shiro.session.mgt.eis.SessionIdGenerator;
 import org.apache.shiro.spring.web.ShiroFilterFactoryBean;
-import org.apache.shiro.web.mgt.CookieRememberMeManager;
 import org.apache.shiro.web.mgt.DefaultWebSecurityManager;
 import org.apache.shiro.web.servlet.SimpleCookie;
 import org.apache.shiro.web.session.mgt.DefaultWebSessionManager;
@@ -22,26 +18,46 @@ import org.crazycake.shiro.IRedisManager;
 import org.crazycake.shiro.RedisCacheManager;
 import org.crazycake.shiro.RedisSessionDAO;
 import org.crazycake.shiro.serializer.ObjectSerializer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.yumingzhu.shirodemo.config.redis.KickoutSessionControlFilter;
 
 @Configuration
 public class ShiroConfig {
 
-	static  int globalSessionTimeout = 60 * 60 * 1000;
+	static int globalSessionTimeout = 60 * 60 * 1000;
 
+	@Autowired
+	private RedisTemplate redisTemplate;
+	
 	//shiroFilterFactoryBean
 	@Bean
 	public ShiroFilterFactoryBean getShiroFilterFactoryBean(
 			@Qualifier("securityManager") DefaultWebSecurityManager defaultWebSecurityManager) {
 		ShiroFilterFactoryBean bean = new ShiroFilterFactoryBean();
 		bean.setSecurityManager(defaultWebSecurityManager);
+		Map<String, Filter> filters=new LinkedHashMap<>();
+		KickoutSessionControlFilter kickoutSessionControlFilter = jwtFilter(sessionManager(),redisTemplate);
+
+		filters.put("kickout",kickoutSessionControlFilter);
+		bean.setFilters(filters);
 
 		Map<String, String> mapFilter = new LinkedHashMap<>();
+
+
 		mapFilter.put("/user/add", "authc");
 		mapFilter.put("/user/update", "perms[user:update]");
+		//添加的名称为filters 定义的名称
+		mapFilter.put("/**", "kickout");
+
 
 		bean.setFilterChainDefinitionMap(mapFilter);
 
@@ -50,7 +66,6 @@ public class ShiroConfig {
 		//设置未授权页面
 		bean.setUnauthorizedUrl("/noauth");
 		return bean;
-
 	}
 
 	//DafaultWebSecurituManager
@@ -71,7 +86,7 @@ public class ShiroConfig {
 	}
 
 	@Bean
-	public MemoryConstrainedCacheManager memoryCacheManger(){
+	public MemoryConstrainedCacheManager memoryCacheManger() {
 		return new MemoryConstrainedCacheManager();
 	}
 
@@ -114,15 +129,12 @@ public class ShiroConfig {
 		//使用默认的web session管理器
 		DefaultWebSessionManager sessionManager = new DefaultWebSessionManager();
 		//设置默认 session  操作，存储的环境
-//		sessionManager.setSessionDAO(new MemorySessionDAO());
+		//		sessionManager.setSessionDAO(new MemorySessionDAO());
 		sessionManager.setSessionDAO(redisSessionDAO());
 		sessionManager.setGlobalSessionTimeout(globalSessionTimeout);
 		sessionManager.setSessionIdCookie(sessionIdCookie());
 		return sessionManager;
 	}
-
-
-
 
 	@Bean("sessionIdCookie")
 	public SimpleCookie sessionIdCookie() {
@@ -160,13 +172,24 @@ public class ShiroConfig {
 
 	@Bean(name = "credentialsMatcher")
 	public HashedCredentialsMatcher hashedCredentialsMatcher() {
+		//		HashedCredentialsMatcher hashedCredentialsMatcher =new HashedCredentialsMatcher();
+		/**
+		 * 使用自定义拦截， 三次之后不允许用户登陆
+		 */
 		CustomerMatcher hashedCredentialsMatcher = new CustomerMatcher();
 		hashedCredentialsMatcher.setHashAlgorithmName("md5");
 		hashedCredentialsMatcher.setHashIterations(2);
 		hashedCredentialsMatcher.setStoredCredentialsHexEncoded(true);
-
-
-
 		return hashedCredentialsMatcher;
 	}
+
+	@Bean(name = "kickout")
+	public KickoutSessionControlFilter jwtFilter(SessionManager sessionManager, RedisTemplate redisTemplate) {
+		KickoutSessionControlFilter kickoutSessionControlFilter = new KickoutSessionControlFilter();
+		kickoutSessionControlFilter.setSessionManager(sessionManager);
+		kickoutSessionControlFilter.setRedisTemplate(redisTemplate);
+		kickoutSessionControlFilter.setMaxSessionCount(1);
+		return kickoutSessionControlFilter;
+	}
+
 }
